@@ -1,7 +1,8 @@
 const IPFS = require('ipfs')
 const OrbitDB = require('orbit-db')
+const path = require('path')
 
-let ipfs, orbitDb, db
+let ipfs, orbitDb, db, directory = path.join(process.env.HOME, '.chlu-reputation')
 
 async function prepareIPFS() {
   if (!ipfs || !orbitDb || !db) {
@@ -10,6 +11,7 @@ async function prepareIPFS() {
         EXPERIMENTAL: {
             pubsub: true
         },
+        repo: path.join(directory, 'js-ipfs'),
         config: {
           Addresses: {
             Swarm: [
@@ -24,7 +26,7 @@ async function prepareIPFS() {
     await ipfs.pubsub.subscribe('chlu-reputation-experimental', function(message){
     console.log('Pubsub Message:', message)
     })
-    orbitDb = new OrbitDB(ipfs);
+    orbitDb = new OrbitDB(ipfs, path.join(directory, 'orbit-db'));
     db = await orbitDb.kvstore('chlu-reputation-experimental', {
         write: ['*']
     });
