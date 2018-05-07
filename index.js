@@ -1,6 +1,8 @@
 const IPFS = require('ipfs')
 const OrbitDB = require('orbit-db')
 const path = require('path')
+const CID = require('cids')
+const multihashes = require('multihashes')
 
 let ipfs, orbitDb, db, directory = path.join(process.env.HOME, '.chlu-reputation')
 
@@ -30,6 +32,7 @@ async function prepareIPFS() {
     db = await orbitDb.kvstore('chlu-reputation-experimental', {
         write: ['*']
     });
+    await db.load()
   }
 }
 
@@ -60,30 +63,73 @@ async function pin(m) {
             console.log(error);
         }
     } else {
-        console.log('Replicating', m)
+        console.log('Caching', m)
         try {
             //await ipfs.dag.tree(m);
             await ipfs.dag.get(m);
-            console.log('Replicated', m)
+            console.log('Cached', m)
         } catch (error) {
             console.log(error);
         }
     }
 }
 
+function isCID(cid) {
+    if (CID.isCID(cid)) return true
+    try {
+        multihashes.fromB58String(cid);
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+async function mapDIDidToIPFSAddress(didAddress) {
+    console.log('Trying to map DID UUID for DID at', didAddress)
+    const result = await ipfs.dag.get(didAddress)
+    let did
+    if (result.value && result.value.data && result.value.data.toString) {
+        const string = result.value.data.toString()
+        try {
+            did = JSON.parse(string)
+        } catch (error) {
+            did = null
+        }
+    } else {
+        did = result.value
+    }
+    if (did && did.id) {
+        const existing = await db.get(did.id)
+        if (existing === didAddress) {
+            console.log('DID', did.id, 'already mapped to', didAddress)
+        } else {
+            console.log('Mapping DID', did.id, 'to', didAddress)
+            await db.set(did.id, didAddress)
+        }
+    } else {
+        console.log('DID at', didAddress, 'does not look valid')
+    }
+}
+
 async function onReplicated() {
+    return refresh()
+}
+
+async function refresh() {
     const keys = Object.keys(db._index._index);
     console.log('Have keys', keys)
     for (const k of keys) {
         console.log('Checking key', k)
-        await pin(k);
+        if (isCID(k)) await pin(k);
         const v = await db.get(k);
-        await pin(v);
+        if (isCID(v)) await pin(v);
+        if (isCID(k)) await mapDIDidToIPFSAddress(k)
     }
 }
 
 function main() {
     prepareIPFS()
+        .then(() => refresh())
         .then(function(){
             db.events.on('replicated', onReplicated);
             console.log('Ready')
