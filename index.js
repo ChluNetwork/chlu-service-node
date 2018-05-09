@@ -100,8 +100,8 @@ async function mapDIDidToIPFSAddress(didAddress) {
     }
     if (did && did.id) {
         const existing = await db.get(did.id)
-        if (existing === didAddress) {
-            console.log('DID', did.id, 'already mapped to', didAddress)
+        if (existing) {
+            console.log('DID', did.id, 'already mapped to', existing)
         } else {
             console.log('Mapping DID', did.id, 'to', didAddress)
             await db.set(did.id, didAddress)
