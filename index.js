@@ -25,9 +25,6 @@ async function prepareIPFS() {
       });
       ipfs.on('ready', function(){ resolve(ipfs) });
     })
-    await ipfs.pubsub.subscribe('chlu-reputation-experimental', function(message){
-    console.log('Pubsub Message:', message)
-    })
     orbitDb = new OrbitDB(ipfs, path.join(directory, 'orbit-db'));
     db = await orbitDb.kvstore('chlu-reputation-experimental', {
         write: ['*']
