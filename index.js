@@ -26,7 +26,7 @@ async function prepareIPFS() {
       ipfs.on('ready', function(){ resolve(ipfs) });
     })
     orbitDb = new OrbitDB(ipfs, path.join(directory, 'orbit-db'));
-    db = await orbitDb.kvstore('chlu-reputation-experimental', {
+    db = await orbitDb.kvstore('chlu-reputation-experimental-2', {
         write: ['*']
     });
     await db.load()
