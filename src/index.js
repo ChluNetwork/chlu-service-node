@@ -23,6 +23,7 @@ process.on('SIGINT', async function() {
 async function start(cmd) {
     serviceNode = new ServiceNode(cmd.directory || defaultDirectory)
     await serviceNode.start()
+    if (cmd.port) await serviceNode.listen(cmd.port)
     if (cmd.refresh) await serviceNode.refresh()
 }
 
@@ -36,6 +37,7 @@ cli
     // Chlu specific options
     .option('-d, --directory <path>', 'where to store chlu data, defaults to ~/.chlu-reputation')
     .option('-r, --refresh', 'rerun pinning on all data')
+    .option('-p, --port <port>', 'specify this to open an HTTP API at the given port', parseInt)
     .action(cmd => {
         start(cmd)
             .catch(function(error) {

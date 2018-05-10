@@ -3,12 +3,21 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "mocha --opts tests/mocha.opts"
   },
   "license": "MIT",
   "dependencies": {
+    "body-parser": "^1.18.2",
     "commander": "^2.15.1",
+    "express": "^4.16.3",
     "ipfs": "^0.28.2",
     "orbit-db": "^0.19.7"
+  },
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "mocha": "^5.1.1",
+    "sinon": "^5.0.7",
+    "supertest": "^3.0.0"
   }
 }

@@ -1,5 +1,6 @@
 const { prepareIPFS, prepareOrbitDB, pin, isCID, dagGetResultToObject } = require('./ipfs')
 const log = require('./logger')
+const getWebServer = require('./http')
 
 class ReputationServiceNode {
     constructor(directory) {
@@ -7,6 +8,7 @@ class ReputationServiceNode {
         this.ipfs = null
         this.orbitDb = null
         this.db = null
+        this.httpServer = null
     }
 
     async start() {
@@ -33,6 +35,15 @@ class ReputationServiceNode {
         if (this.orbitDb) await this.orbitDb.stop()
         if (this.ipfs) await this.ipfs.stop()
         log('Stopped Service Node')
+    }
+
+    async listen(port) {
+        this.port = port
+        this.httpServer = getWebServer(this)
+        await new Promise(resolve => {
+            this.httpServer.listen(port, resolve)
+        })
+        log('HTTP Server listening on port', port)
     }
     
     async pin(cid) {
@@ -99,10 +110,10 @@ class ReputationServiceNode {
             log('Checking key', k)
             if (isCID(k)) await this.mapDIDidToIPFSAddress(k)
             const didInfo = await this.getDIDInfo(k)
-            await Promise.all([
-                this.pin(didInfo.address),
-                this.pin(didInfo.ddoAddress)
-            ])
+            const promises = []
+            if (isCID(didInfo.address)) promises.push(this.pin(didInfo.address))
+            if (isCID(didInfo.ddoAddress)) promises.push(this.pin(didInfo.ddoAddress))
+            await Promise.all(promises)
             log('Checked key successfully', k)
             return true
         } catch (error) {
@@ -110,6 +121,20 @@ class ReputationServiceNode {
             log(error)
             return false
         }
+    }
+
+    async saveDidAndReputation(didDocument, reviews) {
+        log('Saving Reputation (' + reviews.length + ' reviews) for DID', didDocument.id)
+        const dagNode = await this.ipfs.object.put(Buffer.from(JSON.stringify(didDocument)))
+        const didMultihash = dagNode.toJSON().multihash
+        const reputation = {
+            reviews,
+            did: { '/': didMultihash }
+        }
+        const reputationDagNode = await this.ipfs.object.put(Buffer.from(JSON.stringify(reputation)))
+        const reputationMultihash = reputationDagNode.toJSON().multihash
+        await this.db.set(didMultihash, reputationMultihash)
+        log('Reputation (' + reviews.length + ' reviews) for DID', didDocument.id, 'saved successfully')
     }
 }
 
