@@ -7,6 +7,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "commander": "^2.15.1",
     "ipfs": "^0.28.2",
     "orbit-db": "^0.19.7"
   }

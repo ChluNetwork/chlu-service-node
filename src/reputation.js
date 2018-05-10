@@ -10,16 +10,22 @@ class ReputationServiceNode {
     }
 
     async start() {
-        this.ipfs = await prepareIPFS(this.directory)
-        const distributedServices = await prepareOrbitDB(this.ipfs, this.directory)
-        this.orbitDb = distributedServices.orbitDb
-        this.db = distributedServices.db
-        const self = this
-        this.db.events.on('replicated', () => {
-            log('OrbitDB replicated from another peer. Oplog size:', this.db._oplog.length)
-            this.onReplicated()
-        })
-        await this.refresh()
+        if (!this.ipfs) {
+            this.ipfs = await prepareIPFS(this.directory)
+        }
+        if (!this.db) {
+            const distributedServices = await prepareOrbitDB(this.ipfs, this.directory)
+            this.orbitDb = distributedServices.orbitDb
+            this.db = distributedServices.db
+            const self = this
+            this.db.events.on('replicated', () => {
+                log('OrbitDB replicated from another peer. Oplog size:', this.db._oplog.length)
+            })
+            await this.db.load()
+            this.db._index.events.on('new', k => self.checkDBKey(k))
+            this.db._index.events.on('changed', k => self.checkDBKey(k))
+            log('Waiting for new content')
+        }
     }
 
     async stop() {
@@ -70,10 +76,6 @@ class ReputationServiceNode {
         return { address, ddoAddress }
     }
 
-    async onReplicated() {
-        return refresh()
-    }
-
     async refresh() {
         try {
             const keys = Object.keys(this.db._index._index);
@@ -83,21 +85,30 @@ class ReputationServiceNode {
                 const k = keys[i]
                 const ii = parseInt(i) + 1
                 log('Checking key ' + ii + '/' + total, k)
-                try {
-                    if (isCID(k)) await this.mapDIDidToIPFSAddress(k)
-                    const didInfo = await this.getDIDInfo(k)
-                    await Promise.all([
-                        this.pin(didInfo.address),
-                        this.pin(didInfo.ddoAddress)
-                    ])
-                    log('Checked key successfully ' + ii + '/' + total, k)
-                } catch (error) {
-                    log('Key ' + ii + '/' + total, k, 'caused an error')
-                    log(error)
-                }
+                const wentOk = await this.checkDBKey(k)
+                if (wentOk) log('Checked key ' + ii + '/' + total, k)
+                else log('Key ' + ii + '/' + total, k, 'caused an error')
             }
         } catch (error) {
             log(error)
+        }
+    }
+
+    async checkDBKey(k) {
+        try {
+            log('Checking key', k)
+            if (isCID(k)) await this.mapDIDidToIPFSAddress(k)
+            const didInfo = await this.getDIDInfo(k)
+            await Promise.all([
+                this.pin(didInfo.address),
+                this.pin(didInfo.ddoAddress)
+            ])
+            log('Checked key successfully', k)
+            return true
+        } catch (error) {
+            log('Key', k, 'caused an error')
+            log(error)
+            return false
         }
     }
 }

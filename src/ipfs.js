@@ -5,6 +5,7 @@ const CID = require('cids')
 const multihashes = require('multihashes')
 const log = require('./logger')
 const path = require('path')
+const ChluReputationStoreKVIndex = require('./orbitindex')
 
 async function prepareIPFS(directory) {
     log('Creating IPFS with directory', directory)
@@ -33,12 +34,12 @@ async function prepareOrbitDB(ipfs, directory) {
     log('Creating OrbitDB with directory', directory)
     const orbitDb = new OrbitDB(ipfs, path.join(directory, 'orbit-db'));
     const db = await orbitDb.kvstore('chlu-reputation-experimental-2', {
-        write: ['*']
+        write: ['*'],
+        Index: ChluReputationStoreKVIndex
     });
     db.events.on('load', () => log('OrbitDB: Load'))
     db.events.on('load.progress', (address, hash, entry, progress, total) => log('OrbitDB Load Progress ' + progress + '/' + total))
     log('OrbitDB address', db.address.toString())
-    await db.load()
     return { orbitDb, db }
 }
 
