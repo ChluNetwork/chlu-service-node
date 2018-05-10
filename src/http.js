@@ -2,10 +2,12 @@ const express = require('express')
 const { isCID } = require('./ipfs')
 const log = require('./logger')
 const bodyParser = require('body-parser')
+const cors = require('cors')
 
 function getWebServer(serviceNode) {
     const app = express()
     app.use(bodyParser.json())
+    app.use(cors());
     app.get('/', (req, res) => res.send('Chlu Reputation Service Node').end())
     app.post('/reputation', async (req, res) => {
         // TODO: use bodyparser

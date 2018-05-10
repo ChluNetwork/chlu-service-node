@@ -133,8 +133,13 @@ class ReputationServiceNode {
         }
         const reputationDagNode = await this.ipfs.object.put(Buffer.from(JSON.stringify(reputation)))
         const reputationMultihash = reputationDagNode.toJSON().multihash
-        await this.db.set(didMultihash, reputationMultihash)
-        log('Reputation (' + reviews.length + ' reviews) for DID', didDocument.id, 'saved successfully')
+        const existing = await this.db.get(didMultihash)
+        if (existing === reputationMultihash) {
+            log('Reputation (' + reviews.length + ' reviews) for DID', didDocument.id, 'was already in the DB')
+        } else {
+            await this.db.set(didMultihash, reputationMultihash)
+            log('Reputation (' + reviews.length + ' reviews) for DID', didDocument.id, 'saved successfully')
+        }
     }
 }
 
