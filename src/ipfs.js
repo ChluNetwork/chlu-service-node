@@ -37,7 +37,7 @@ async function prepareOrbitDB(ipfs, directory) {
         write: ['*'],
         Index: ChluReputationStoreKVIndex
     });
-    this.db.events.on('replicated', () => {
+    db.events.on('replicated', () => {
         log('OrbitDB replicated from another peer. Oplog size:', db._oplog.length)
     })
     db.events.on('load', () => log('OrbitDB: Load'))

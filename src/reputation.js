@@ -1,6 +1,5 @@
 const { prepareIPFS, prepareOrbitDB, pin, isCID, dagGetResultToObject } = require('./ipfs')
 const log = require('./logger')
-const getWebServer = require('./http')
 
 class ReputationServiceNode {
     constructor(directory) {
@@ -32,15 +31,6 @@ class ReputationServiceNode {
         if (this.orbitDb) await this.orbitDb.stop()
         if (this.ipfs) await this.ipfs.stop()
         log('Stopped Service Node')
-    }
-
-    async listen(port) {
-        this.port = port
-        this.httpServer = getWebServer(this)
-        await new Promise(resolve => {
-            this.httpServer.listen(port, resolve)
-        })
-        log('HTTP Server listening on port', port)
     }
     
     async pin(cid) {
