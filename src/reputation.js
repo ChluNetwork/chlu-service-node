@@ -1,6 +1,5 @@
 const { prepareIPFS, prepareOrbitDB, pin, isCID, dagGetResultToObject } = require('./ipfs')
 const log = require('./logger')
-const getWebServer = require('./http')
 
 class ReputationServiceNode {
     constructor(directory) {
@@ -20,9 +19,6 @@ class ReputationServiceNode {
             this.orbitDb = distributedServices.orbitDb
             this.db = distributedServices.db
             const self = this
-            this.db.events.on('replicated', () => {
-                log('OrbitDB replicated from another peer. Oplog size:', this.db._oplog.length)
-            })
             await this.db.load()
             this.db._index.events.on('new', k => self.checkDBKey(k))
             this.db._index.events.on('changed', k => self.checkDBKey(k))
@@ -36,55 +32,9 @@ class ReputationServiceNode {
         if (this.ipfs) await this.ipfs.stop()
         log('Stopped Service Node')
     }
-
-    async listen(port) {
-        this.port = port
-        this.httpServer = getWebServer(this)
-        await new Promise(resolve => {
-            this.httpServer.listen(port, resolve)
-        })
-        log('HTTP Server listening on port', port)
-    }
     
     async pin(cid) {
         return pin(this.ipfs, cid)
-    }
-
-    async mapDIDidToIPFSAddress(didAddress) {
-        log('Trying to map DID UUID for DID at', didAddress)
-        const did = dagGetResultToObject(await this.ipfs.dag.get(didAddress))
-        if (did && did.id) {
-            const existing = await this.db.get(did.id)
-            if (existing) {
-                log('DID', did.id, 'already mapped to', existing)
-            } else {
-                log('Mapping DID', did.id, 'to', didAddress)
-                await this.db.set(did.id, didAddress)
-            }
-        } else {
-            log('DID at', didAddress, 'does not look valid')
-        }
-    }
-
-    async getDIDAddress(didId) {
-        let didAddress = null
-        if (didId && didId.indexOf('did:chlu:') === 0) {
-            log('DID ID is a DID UUID', didId)
-            didAddress = await this.db.get(didId)
-            log('DID UUID', didId, 'resolved to Address', didAddress)
-        } else if (isCID(didId)) {
-            log('DID ID is a DID IPFS Address', didId)
-            didAddress = didId
-        } else {
-            throw new Error('Invalid DID ID ' + didId)
-        }
-        return didAddress
-    }
-
-    async getDIDInfo(didId) {
-        const address = await this.getDIDAddress(didId)
-        const ddoAddress = await this.db.get(address)
-        return { address, ddoAddress }
     }
 
     async refresh() {
@@ -108,37 +58,21 @@ class ReputationServiceNode {
     async checkDBKey(k) {
         try {
             log('Checking key', k)
-            if (isCID(k)) await this.mapDIDidToIPFSAddress(k)
-            const didInfo = await this.getDIDInfo(k)
-            const promises = []
-            if (isCID(didInfo.address)) promises.push(this.pin(didInfo.address))
-            if (isCID(didInfo.ddoAddress)) promises.push(this.pin(didInfo.ddoAddress))
-            await Promise.all(promises)
+            if (typeof k === 'string' && k.indexOf('did:chlu:') === 0) {
+                log('Key ' + k + ' is a DID ID')
+                const cid = await this.db.get(k)
+                if (isCID(cid)) {
+                    log('Key ' + k + ' Value ' + cid + ' is an IPFS CID')
+                    await this.pin(cid)
+                    log('Key ' + k + ' Value ' + cid + ' has been pinned')
+                }
+            }
             log('Checked key successfully', k)
             return true
         } catch (error) {
             log('Key', k, 'caused an error')
             log(error)
             return false
-        }
-    }
-
-    async saveDidAndReputation(didDocument, reviews) {
-        log('Saving Reputation (' + reviews.length + ' reviews) for DID', didDocument.id)
-        const dagNode = await this.ipfs.object.put(Buffer.from(JSON.stringify(didDocument)))
-        const didMultihash = dagNode.toJSON().multihash
-        const reputation = {
-            reviews,
-            did: { '/': didMultihash }
-        }
-        const reputationDagNode = await this.ipfs.object.put(Buffer.from(JSON.stringify(reputation)))
-        const reputationMultihash = reputationDagNode.toJSON().multihash
-        const existing = await this.db.get(didMultihash)
-        if (existing === reputationMultihash) {
-            log('Reputation (' + reviews.length + ' reviews) for DID', didDocument.id, 'was already in the DB')
-        } else {
-            await this.db.set(didMultihash, reputationMultihash)
-            log('Reputation (' + reviews.length + ' reviews) for DID', didDocument.id, 'saved successfully')
         }
     }
 }

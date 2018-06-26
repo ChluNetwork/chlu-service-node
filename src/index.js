@@ -23,7 +23,6 @@ process.on('SIGINT', async function() {
 async function start(cmd) {
     serviceNode = new ServiceNode(cmd.directory || defaultDirectory)
     await serviceNode.start()
-    if (cmd.port) await serviceNode.listen(cmd.port)
     if (cmd.refresh) await serviceNode.refresh()
 }
 

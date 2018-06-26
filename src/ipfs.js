@@ -33,10 +33,13 @@ async function prepareIPFS(directory) {
 async function prepareOrbitDB(ipfs, directory) {
     log('Creating OrbitDB with directory', directory)
     const orbitDb = new OrbitDB(ipfs, path.join(directory, 'orbit-db'));
-    const db = await orbitDb.kvstore('chlu-reputation-experimental-2', {
+    const db = await orbitDb.kvstore('chlu-reputation-experimental-3', {
         write: ['*'],
         Index: ChluReputationStoreKVIndex
     });
+    db.events.on('replicated', () => {
+        log('OrbitDB replicated from another peer. Oplog size:', db._oplog.length)
+    })
     db.events.on('load', () => log('OrbitDB: Load'))
     db.events.on('load.progress', (address, hash, entry, progress, total) => log('OrbitDB Load Progress ' + progress + '/' + total))
     log('OrbitDB address', db.address.toString())
